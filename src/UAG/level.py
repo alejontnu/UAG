@@ -1,19 +1,29 @@
 from random import choice
 import pygame
+from weapon import Weapon
 from settings import *
 from tile import Tile
 from player import Player
 from debug import debug
+from ui import UI
 from utility import import_csv_layout, import_folder
 
 class Level():
     def __init__(self):
         self.display_surface = pygame.display.get_surface()
 
+        # Sprite groups
         self.visible_sprites = YSortCameraGroup()
         self.obstacle_sprites = pygame.sprite.Group()
 
+        # Attack sprites
+        self.current_attack = None
+
+        # Map generation
         self.create_map()
+
+        # UI
+        self.ui = UI()
 
     def create_map(self):
         layouts = {
@@ -42,11 +52,33 @@ class Level():
                             object_surf = graphics['objects'][int(col)]
                             Tile((x,y),[self.visible_sprites,self.obstacle_sprites],'object',object_surf)
 
-        self.player = Player((3000,3000),[self.visible_sprites],self.obstacle_sprites)
+        self.player = Player(
+            (3000,3000),
+            [self.visible_sprites],
+            self.obstacle_sprites,
+            self.create_attack,self.destroy_attack,
+            self.create_magic,self.destroy_magic)
+
+    def create_attack(self):
+        self.current_attack = Weapon(self.player,[self.visible_sprites])
+
+    def destroy_attack(self):
+        if self.current_attack:
+            self.current_attack.kill()
+        self.current_attack = None
+
+    def create_magic(self,style,strength,cost):
+        print(style)
+        print(strength)
+        print(cost)
+
+    def destroy_magic(self):
+        pass
 
     def run(self):
         self.visible_sprites.custom_draw(self.player)
         self.visible_sprites.update()
+        self.ui.display(self.player)
 
 class YSortCameraGroup(pygame.sprite.Group):
     def __init__(self):

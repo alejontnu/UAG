@@ -3,7 +3,7 @@ from utility import import_folder
 from settings import *
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self,pos,groups,obstacle_sprites):
+    def __init__(self,pos,groups,obstacle_sprites,create_attack,destroy_attack,create_magic,destroy_magic):
         super().__init__(groups)
         self.image = pygame.image.load('graphics/player/up_idle/player.png').convert_alpha()
         self.rect = self.image.get_rect(topleft = pos)
@@ -15,12 +15,37 @@ class Player(pygame.sprite.Sprite):
         self.animation_speed = 0.15
 
         self.direction = pygame.math.Vector2()
-        self.speed = 5
         self.attacking = False
         self.attack_cd = 400
         self.attack_time = None
 
         self.obstacle_sprites = obstacle_sprites
+
+        # Weapon equip selection
+        self.create_attack = create_attack
+        self.destroy_attack = destroy_attack
+        self.weapon_index = 0
+        self.weapon = list(weapon_data.keys())[self.weapon_index]
+        self.can_switch_weapon = True
+        self.weapon_switch_time = None
+        self.switch_cd = 200
+
+        # Magic
+        self.create_magic = create_magic
+        self.destroy_magic = destroy_magic
+        self.magic_index = 0
+        self.magic = list(magic_data.keys())[self.magic_index]
+        self.can_switch_magic = True
+        self.magic_switch_time = None
+
+        # Player stats
+        self.stats = {'health': 100,'energy':60,'attack': 10,'magic': 4,'speed': 5}
+        self.health = self.stats['health']
+        self.energy = self.stats['energy']
+        self.exp = 420
+        self.speed = self.stats['speed']
+        self.max_stats = {'health': 300, 'energy': 140, 'attack': 20, 'magic' : 10, 'speed': 10}
+        self.upgrade_cost = {'health': 100, 'energy': 100, 'attack': 100, 'magic' : 100, 'speed': 100}
 
     def import_player_assets(self):
         character_path = 'graphics/player/'
@@ -33,8 +58,8 @@ class Player(pygame.sprite.Sprite):
             self.animations[animation] = import_folder(full_path)
 
     def input(self):
-        # movement
         if not self.attacking:
+            # Movement
             keys = pygame.key.get_pressed()
             if keys[pygame.K_w]:
                 self.direction.y = -1
@@ -55,18 +80,40 @@ class Player(pygame.sprite.Sprite):
                 self.direction.x = 0
 
             # Melee attack
-            if keys[pygame.K_SPACE] and not self.attacking:
+            if keys[pygame.K_SPACE] :
                 self.attacking = True
                 self.attack_time = pygame.time.get_ticks()
-                print("Melee")
-            # Ranged attack
-            if keys[pygame.K_c] and not self.attacking:
+                self.create_attack()
+
+            # Magic attack
+            if keys[pygame.K_c]:
                 self.attacking = True
                 self.attack_time = pygame.time.get_ticks()
-                print("Ranged")
-            # Special attack
-            if keys[pygame.K_e]:
-                pass
+                style = list(magic_data.keys())[self.magic_index]
+                strength = list(magic_data.values())[self.magic_index]['strength'] + self.stats['magic']
+                cost = list(magic_data.values())[self.magic_index]['cost']
+                self.create_magic(style,strength,cost)
+
+            # Weapon selection
+            if keys[pygame.K_e] and self.can_switch_weapon:
+                self.can_switch_weapon = False
+                self.weapon_switch_time = pygame.time.get_ticks()
+                if self.weapon_index + 1 < NUMBER_WEAPONS:
+                    self.weapon_index += 1
+                else:
+                    self.weapon_index = 0
+                self.weapon = list(weapon_data.keys())[self.weapon_index]
+
+            # Magic selection
+            if keys[pygame.K_q] and self.can_switch_magic:
+                self.can_switch_magic = False
+                self.magic_switch_time = pygame.time.get_ticks()
+                if self.magic_index + 1 < NUMBER_SPELLS:
+                    self.magic_index += 1
+                else: 
+                    self.magic_index = 0
+                self.magic = list(magic_data.keys())[self.magic_index]
+
 
     def get_status(self):
         if self.direction.x == 0 and self.direction.y == 0:
@@ -112,9 +159,15 @@ class Player(pygame.sprite.Sprite):
 
     def cooldowns(self):
         current_time = pygame.time.get_ticks()
+        # clear attack state
         if self.attacking:
             if current_time - self.attack_time >= self.attack_cd:
                 self.attacking = False
+                self.destroy_attack()
+        # Clear weapon switch state
+        if not self.can_switch_weapon:
+            if current_time - self.weapon_switch_time >= self.switch_cd:
+                self.can_switch_weapon = True
 
     def animate(self):
         animation = self.animations[self.status]
